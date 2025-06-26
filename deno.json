@@ -1,7 +1,10 @@
 {
-  "name": "url-authentication-capture",
+  "name": "@hugojosefson/url-authentication-capture",
   "version": "0.1.0",
-  "exports": "./mod.ts",
+  "exports": {
+    ".": "./mod.ts",
+    "./cli": "./src/cli.ts"
+  },
   "tasks": {
     "dev": "deno test --watch"
   },
