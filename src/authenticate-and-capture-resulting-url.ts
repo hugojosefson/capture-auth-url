@@ -27,7 +27,6 @@ export async function authenticateAndCaptureResultingUrl(
   htmlTitle: string = "Authentication",
   open: (loginUrl: string) => Promise<void> = defaultOpen,
 ): Promise<URL> {
-  await open(`${loginUrl}`);
   const { server, urlPromise } = startServer(
     port,
     totalTimeoutMillis,
@@ -35,6 +34,8 @@ export async function authenticateAndCaptureResultingUrl(
     htmlLang,
     htmlTitle,
   );
+  await open(`${loginUrl}`);
+  const url = await urlPromise;
   await server.shutdown();
-  return urlPromise;
+  return url;
 }
