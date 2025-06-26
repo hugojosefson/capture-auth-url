@@ -17,7 +17,7 @@ import { startServer } from "./start-server.ts";
  * @param open {(loginUrl: string) => Promise<void>} Function to open the login URL in the user's browser. Defaults to `jsr:@rdsq/open`.
  * @return {URL} The full URL the user was redirected back to.
  */
-export async function authenticateAndCaptureResultingUrl(
+export async function captureAuthUrl(
   loginUrl: string | URL,
   port: number = extractRedirectPort(loginUrl),
   totalTimeoutMillis: number = 10 * 60_000, // 10 minutes

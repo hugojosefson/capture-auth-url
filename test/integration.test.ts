@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { getPort } from "@openjs/port-free";
 import { startServer } from "../src/start-server.ts";
-import { authenticateAndCaptureResultingUrl } from "../src/authenticate-and-capture-resulting-url.ts";
+import { captureAuthUrl } from "../src/capture-auth-url.ts";
 
 function getRandomPort(): Promise<number> {
   return getPort({ port: undefined, random: true });
@@ -44,7 +44,7 @@ Deno.test("startServer integration", async () => {
   }
 });
 
-Deno.test("authenticateAndCaptureResultingUrl integration", async () => {
+Deno.test("captureAuthUrl integration", async () => {
   const port = await getRandomPort();
   let openedUrl: string | undefined;
 
@@ -64,7 +64,7 @@ Deno.test("authenticateAndCaptureResultingUrl integration", async () => {
 
   const loginUrl =
     `https://auth.example.com/login?redirect_uri=http://localhost:${port}/callback`;
-  const url = await authenticateAndCaptureResultingUrl(
+  const url = await captureAuthUrl(
     loginUrl,
     port,
     5000,

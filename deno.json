@@ -1,5 +1,5 @@
 {
-  "name": "@hugojosefson/url-authentication-capture",
+  "name": "@hugojosefson/capture-auth-url",
   "version": "0.1.0",
   "exports": {
     ".": "./mod.ts",

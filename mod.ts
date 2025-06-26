@@ -1,1 +1,1 @@
-export { authenticateAndCaptureResultingUrl } from "./src/authenticate-and-capture-resulting-url.ts";
+export { captureAuthUrl } from "./src/capture-auth-url.ts";
