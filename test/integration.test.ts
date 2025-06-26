@@ -1,9 +1,14 @@
 import { assertEquals } from "@std/assert";
+import { getPort } from "@openjs/port-free";
 import { startServer } from "../src/start-server.ts";
 import { authenticateAndCaptureResultingUrl } from "../src/authenticate-and-capture-resulting-url.ts";
 
+function getRandomPort(): Promise<number> {
+  return getPort({port: undefined, random: true});
+}
+
 Deno.test("startServer integration", async () => {
-  const port = 8081;
+  const port = await getRandomPort();
   const { server, urlPromise } = startServer(
     port,
     5000,
@@ -40,7 +45,7 @@ Deno.test("startServer integration", async () => {
 });
 
 Deno.test("authenticateAndCaptureResultingUrl integration", async () => {
-  const port = 8082;
+  const port = await getRandomPort();
   let openedUrl: string | undefined;
 
   // Mock open function that simulates browser behavior

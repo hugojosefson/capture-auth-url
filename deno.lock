@@ -1,12 +1,16 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@openjs/port-free@1": "1.0.0",
     "jsr:@rdsq/open@^1.0.1": "1.0.1",
     "jsr:@std/assert@1": "1.0.13",
     "jsr:@std/internal@^1.0.6": "1.0.6",
     "npm:@types/node@*": "22.13.13"
   },
   "jsr": {
+    "@openjs/port-free@1.0.0": {
+      "integrity": "0b70adc419a37d6c15d049a369cbc2020795bf50118409dde077efcae9e8e2e4"
+    },
     "@rdsq/open@1.0.1": {
       "integrity": "48983722b08e7d6c313561536b1112edeeb1023d1cc31e1b3eedb1de026fcea7"
     },
@@ -33,6 +37,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@openjs/port-free@1",
       "jsr:@rdsq/open@^1.0.1",
       "jsr:@std/assert@1"
     ]
