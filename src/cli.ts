@@ -1,7 +1,8 @@
 #!/usr/bin/env -S deno run --allow-net --allow-run --allow-env --allow-read
 import { authenticateAndCaptureResultingUrl } from "./authenticate-and-capture-resulting-url.ts";
 
-const USAGE = `
+/** Usage instructions for the CLI. */
+export const USAGE: string = `
 Usage:   deno run --allow-net --allow-run --allow-env --allow-read jsr:@hugojosefson/url-authentication-capture/cli <loginUrl> [port]
 Example: deno run --allow-net --allow-run --allow-env --allow-read jsr:@hugojosefson/url-authentication-capture/cli "https://example.com/login?redirect_uri=http://localhost:1234/callback"
 `.trim();

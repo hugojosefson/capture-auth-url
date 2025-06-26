@@ -5,11 +5,12 @@ Deno.test("handleFirstRequest", async (t) => {
   await t.step(
     "returns HTML response with correct lang and title",
     async () => {
-      const response = handleFirstRequest("sv", "Test Title");
+      const response = handleFirstRequest("/test-path", "sv", "Test Title");
       assertEquals(response.headers.get("Content-Type"), "text/html");
       const html = await response.text();
       assertEquals(html.includes('lang="sv"'), true);
       assertEquals(html.includes("<title>Test Title</title>"), true);
+      assertEquals(html.includes(`fetch('/test-path'`), true);
     },
   );
 });

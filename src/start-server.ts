@@ -29,9 +29,9 @@ export function startServer(
   );
 
   const { handler, urlPromise } = createHandler(
+    returnInstructions,
     htmlLang,
     htmlTitle,
-    returnInstructions,
   );
   urlPromise.finally(() => clearTimeout(totalTimeoutId));
 

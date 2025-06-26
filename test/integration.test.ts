@@ -4,7 +4,7 @@ import { startServer } from "../src/start-server.ts";
 import { authenticateAndCaptureResultingUrl } from "../src/authenticate-and-capture-resulting-url.ts";
 
 function getRandomPort(): Promise<number> {
-  return getPort({port: undefined, random: true});
+  return getPort({ port: undefined, random: true });
 }
 
 Deno.test("startServer integration", async () => {
