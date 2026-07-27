@@ -1,6 +1,7 @@
 import defaultOpen from "@rdsq/open";
 import { extractRedirectPort } from "./extract-redirect-port.ts";
 import { startServer } from "./start-server.ts";
+import type { CaptureAuthUrlOptions } from "./options.ts";
 
 /**
  * - Opens a login URL in the user's browser.
@@ -17,24 +18,52 @@ import { startServer } from "./start-server.ts";
  * @param open {(loginUrl: string) => Promise<void>} Function to open the login URL in the user's browser. Defaults to `jsr:@rdsq/open`.
  * @return {URL} The full URL the user was redirected back to.
  */
+export function captureAuthUrl(
+  loginUrl: string | URL,
+  port?: number,
+  totalTimeoutMillis?: number,
+  returnInstructions?: string | Response,
+  htmlLang?: string,
+  htmlTitle?: string,
+  open?: (loginUrl: string) => Promise<void>,
+): Promise<URL>;
+export function captureAuthUrl(
+  loginUrl: string | URL,
+  options: CaptureAuthUrlOptions,
+): Promise<URL>;
 export async function captureAuthUrl(
   loginUrl: string | URL,
-  port: number = extractRedirectPort(loginUrl),
-  totalTimeoutMillis: number = 10 * 60_000, // 10 minutes
+  portOrOptions: number | CaptureAuthUrlOptions = extractRedirectPort(loginUrl),
+  totalTimeoutMillis: number = 10 * 60_000,
   returnInstructions: string | Response =
     "<h1>Done.</h1><h2>Please close this tab/window and return to the program.</h2>",
   htmlLang: string = "en",
   htmlTitle: string = "Authentication",
   open: (loginUrl: string) => Promise<void> = defaultOpen,
 ): Promise<URL> {
-  const { server, urlPromise } = startServer(
-    port,
-    totalTimeoutMillis,
-    returnInstructions,
-    htmlLang,
-    htmlTitle,
-  );
-  await open(`${loginUrl}`);
+  const options: CaptureAuthUrlOptions = typeof portOrOptions === "number"
+    ? {
+      port: portOrOptions,
+      totalTimeoutMillis,
+      returnInstructions,
+      htmlLang,
+      htmlTitle,
+      open,
+    }
+    : portOrOptions;
+  const { server, urlPromise } = startServer({
+    port: options.port ?? extractRedirectPort(loginUrl),
+    hostname: options.hostname,
+    callbackPath: options.callbackPath,
+    capturePath: options.capturePath,
+    cors: options.cors,
+    totalTimeoutMillis: options.totalTimeoutMillis ?? 10 * 60_000,
+    returnInstructions: options.returnInstructions ??
+      "<h1>Done.</h1><h2>Please close this tab/window and return to the program.</h2>",
+    htmlLang: options.htmlLang ?? "en",
+    htmlTitle: options.htmlTitle ?? "Authentication",
+  });
+  await (options.open ?? defaultOpen)(`${loginUrl}`);
   const url = await urlPromise;
   await server.shutdown();
   return url;

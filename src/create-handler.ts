@@ -11,6 +11,9 @@ export function createHandler(
   returnInstructions: string | Response,
   htmlLang: string,
   htmlTitle: string,
+  callbackPath?: string,
+  capturePath = "/capture-url",
+  cors?: false | string,
 ): {
   handler: (req: Request) => Promise<Response>;
   urlPromise: Promise<URL>;
@@ -20,25 +23,39 @@ export function createHandler(
     resolve = res;
   });
 
-  const capturePath = "/capture-url";
+  const corsHeaders = (methods: string): HeadersInit => {
+    if (cors === undefined) {
+      return {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": methods,
+        "Access-Control-Allow-Headers": "Content-Type",
+      };
+    }
+    if (cors === false) return {};
+    return {
+      "Access-Control-Allow-Origin": cors,
+      "Access-Control-Allow-Methods": methods,
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+  };
   /**
    * Handles the initial request and subsequent URL submission.
    * @param req The incoming HTTP request.
    * @returns A Response object.
    */
   async function handler(req: Request): Promise<Response> {
-    if (req.method === "GET") {
+    const pathname = new URL(req.url).pathname;
+    if (
+      req.method === "GET" &&
+      (callbackPath === undefined || pathname === callbackPath)
+    ) {
       // Handle the initial request
       return handleFirstRequest(capturePath, htmlLang, htmlTitle);
     }
-    if (new URL(req.url).pathname === capturePath) {
+    if (pathname === capturePath) {
       if (req.method === "OPTIONS") {
         return new Response(null, {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-          },
+          headers: corsHeaders("GET, POST, OPTIONS"),
         });
       }
       if (req.method !== "POST") {
@@ -50,16 +67,14 @@ export function createHandler(
         returnInstructions,
       );
       resolve(url);
-      return response;
+      return typeof cors === "string"
+        ? withCorsOrigin(response, cors)
+        : response;
     }
 
     if (req.method === "OPTIONS") {
       return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
+        headers: corsHeaders("GET, OPTIONS"),
       });
     }
 
@@ -67,4 +82,14 @@ export function createHandler(
   }
 
   return { handler, urlPromise };
+}
+
+function withCorsOrigin(response: Response, origin: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

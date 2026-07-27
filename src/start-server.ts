@@ -1,4 +1,5 @@
 import { createHandler } from "./create-handler.ts";
+import type { StartServerOptions } from "./options.ts";
 
 /**
  * Starts a server that listens for HTTP requests on the specified port.
@@ -21,24 +22,64 @@ export function startServer(
   returnInstructions: string | Response,
   htmlLang: string,
   htmlTitle: string,
+): { server: Deno.HttpServer<Deno.NetAddr>; urlPromise: Promise<URL> };
+export function startServer(
+  options: StartServerOptions,
+): { server: Deno.HttpServer<Deno.NetAddr>; urlPromise: Promise<URL> };
+export function startServer(
+  portOrOptions: number | StartServerOptions,
+  totalTimeoutMillis?: number,
+  returnInstructions?: string | Response,
+  htmlLang?: string,
+  htmlTitle?: string,
 ): { server: Deno.HttpServer<Deno.NetAddr>; urlPromise: Promise<URL> } {
+  const options: StartServerOptions = typeof portOrOptions === "number"
+    ? {
+      port: portOrOptions,
+      totalTimeoutMillis: totalTimeoutMillis!,
+      returnInstructions: returnInstructions!,
+      htmlLang: htmlLang!,
+      htmlTitle: htmlTitle!,
+    }
+    : portOrOptions;
+  validatePath(options.callbackPath, "callbackPath");
+  validatePath(options.capturePath, "capturePath");
   const controller = new AbortController();
   const totalTimeoutId = setTimeout(
     controller.abort.bind(controller),
-    totalTimeoutMillis,
+    options.totalTimeoutMillis,
   );
 
   const { handler, urlPromise } = createHandler(
-    returnInstructions,
-    htmlLang,
-    htmlTitle,
+    options.returnInstructions,
+    options.htmlLang,
+    options.htmlTitle,
+    options.callbackPath,
+    options.capturePath,
+    options.cors,
   );
   urlPromise.finally(() => clearTimeout(totalTimeoutId));
 
-  const options = {
-    port,
+  const serveOptions = {
+    port: options.port,
+    ...(options.hostname === undefined ? {} : { hostname: options.hostname }),
     signal: controller.signal,
   };
-  const server: Deno.HttpServer<Deno.NetAddr> = Deno.serve(options, handler);
+  const server: Deno.HttpServer<Deno.NetAddr> = Deno.serve(
+    serveOptions,
+    handler,
+  );
   return { server, urlPromise };
+}
+
+function validatePath(path: string | undefined, name: string): void {
+  if (path === undefined) return;
+  const url = new URL(path, "http://localhost");
+  if (
+    !path.startsWith("/") || url.pathname !== path || url.search || url.hash
+  ) {
+    throw new TypeError(
+      `${name} must be an absolute pathname without a query or fragment`,
+    );
+  }
 }

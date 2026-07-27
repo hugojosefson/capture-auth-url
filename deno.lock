@@ -3,8 +3,8 @@
   "specifiers": {
     "jsr:@openjs/port-free@1": "1.0.0",
     "jsr:@rdsq/open@^1.0.1": "1.0.1",
-    "jsr:@std/assert@1": "1.0.13",
-    "jsr:@std/internal@^1.0.6": "1.0.6",
+    "jsr:@std/assert@^1.0.19": "1.0.19",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
     "npm:@types/node@*": "22.13.13"
   },
   "jsr": {
@@ -14,14 +14,14 @@
     "@rdsq/open@1.0.1": {
       "integrity": "48983722b08e7d6c313561536b1112edeeb1023d1cc31e1b3eedb1de026fcea7"
     },
-    "@std/assert@1.0.13": {
-      "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
       "dependencies": [
         "jsr:@std/internal"
       ]
     },
-    "@std/internal@1.0.6": {
-      "integrity": "9533b128f230f73bd209408bb07a4b12f8d4255ab2a4d22a1fd6d87304aca9a4"
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
     }
   },
   "npm": {
@@ -39,7 +39,7 @@
     "dependencies": [
       "jsr:@openjs/port-free@1",
       "jsr:@rdsq/open@^1.0.1",
-      "jsr:@std/assert@1"
+      "jsr:@std/assert@^1.0.19"
     ]
   }
 }

@@ -12,6 +12,10 @@ export function handleFirstRequest(
   htmlLang: string,
   htmlTitle: string,
 ): Response {
+  // Retain the legacy default page while serializing configured paths for JavaScript.
+  const fetchPath = path === "/capture-url"
+    ? "'/capture-url'"
+    : serializeForInlineScript(path);
   return new Response(
     `
             <!DOCTYPE html>
@@ -21,7 +25,7 @@ export function handleFirstRequest(
                 <script>
                 window.addEventListener('load', () => {
                     const url = window.location.toString();
-                    fetch('${path}', { method: 'POST', body: url })
+                    fetch(${fetchPath}, { method: 'POST', body: url })
                         .then(response => response.text())
                         .then(instructions => {
                         document.body.innerHTML = instructions;
@@ -37,4 +41,13 @@ export function handleFirstRequest(
       headers: { "Content-Type": "text/html" },
     },
   );
+}
+
+function serializeForInlineScript(value: string): string {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
 }
