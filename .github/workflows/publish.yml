@@ -26,5 +26,4 @@ jobs:
         with:
           deno-version: v2.x
       - run: deno task default
-      - run: git restore -- .idea/modules.xml .idea/vcs.xml
       - run: deno publish

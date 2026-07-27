@@ -2,7 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/capture-auth-url.iml" filepath="$PROJECT_DIR$/.idea/capture-auth-url.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/capture-auth-url.iml"
+        filepath="$PROJECT_DIR$/.idea/capture-auth-url.iml" />
     </modules>
   </component>
 </project>
