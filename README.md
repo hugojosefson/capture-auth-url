@@ -52,6 +52,52 @@ Host, Origin, method, content type, and submitted URL target, and uses bounded
 bodies. It does not log callback data. The returned URL and CLI stdout retain
 the captured URL because that is this module's purpose.
 
+## SPA OAuth authorization-code PKCE
+
+`captureSpaOAuthToken` runs a provider-neutral browser SPA OAuth flow. It opens
+the local start page, where browser JavaScript creates PKCE state and verifier,
+then redeems the authorization code directly with the configured HTTPS token
+endpoint. The API returns validated token JSON in memory; it never returns an
+authorization URL containing a code or token.
+
+Microsoft Entra application registrations must allow the exact loopback redirect
+URI and SPA redirect behavior for browser token redemption.
+
+```typescript
+import { captureSpaOAuthToken } from "jsr:@hugojosefson/capture-auth-url";
+
+const token = await captureSpaOAuthToken({
+  authorizationEndpoint:
+    "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize",
+  tokenEndpoint:
+    "https://login.microsoftonline.com/organizations/oauth2/v2.0/token",
+  clientId: "00000000-0000-0000-0000-000000000000",
+  redirectUri: "http://localhost:53682/callback",
+  scopes: ["openid", "profile", "User.Read"],
+});
+```
+
+| Option                                       | Description                                                              |
+| :------------------------------------------- | :----------------------------------------------------------------------- |
+| `authorizationEndpoint`, `tokenEndpoint`     | Required HTTPS OAuth endpoints.                                          |
+| `clientId`, `redirectUri`, `scopes`          | Required OAuth client configuration; redirect URI must be HTTP loopback. |
+| `authorizationParameters`, `tokenParameters` | Additional string parameters; OAuth-owned names are rejected.            |
+| `hostname`, `port`, `callbackPath`           | Must match `redirectUri`; hostname defaults to `localhost`.              |
+| `startPath`, `submissionPath`                | Exact local browser start and submission paths.                          |
+| `maxRequestBodyBytes`, `totalTimeoutMillis`  | Token body limit and total flow timeout.                                 |
+| `returnInstructions`                         | HTML shown after a successful local token submission.                    |
+| `tokenResponseValidator`                     | Validates and types the token response before it resolves.               |
+| `open`, `randomBytes`, `createServer`        | Browser, entropy, and server dependency injection.                       |
+
+The local broker accepts one bounded JSON submission at its configured origin,
+path, and session header. It validates Host, Origin, method, and content type;
+it has no wildcard CORS and produces no listener output. The callback page
+removes OAuth query data from visible history, clears browser session state on
+every terminal path, and does not put codes or tokens in local URLs. Browser
+`fetch` supplies the loopback `Origin` header; the script does not set it. The
+token endpoint must permit that loopback origin through its CORS policy;
+Microsoft Entra does this for redirect URIs registered as SPA redirects.
+
 ### Migrating from 0.2
 
 Replace positional arguments with the options object. `redirect_uri` is now
