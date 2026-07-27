@@ -1,0 +1,27 @@
+name: Default build
+
+on:
+  push:
+    branches:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git revision to build
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno task default
