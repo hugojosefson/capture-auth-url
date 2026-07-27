@@ -5,6 +5,11 @@ on:
     tags:
       - "*.*.*"
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git revision to publish
+        required: true
+        default: main
 
 permissions:
   contents: read
@@ -14,9 +19,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - run: deno task default
+      - run: git restore -- .idea/modules.xml .idea/vcs.xml
       - run: deno publish
