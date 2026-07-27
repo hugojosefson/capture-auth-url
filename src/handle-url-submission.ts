@@ -1,32 +1,54 @@
-/**
- * Handles the submission of a URL from a request.
- * @param req The incoming HTTP request containing the URL in the body.
- * @param returnInstructions Instructions to return to the user after capturing the URL.
- * @returns An object containing the captured URL and a Response object with instructions.
- */
-export async function handleUrlSubmission(
-  req: Request,
-  returnInstructions: string | Response,
-): Promise<{ response: Response; url: URL }> {
-  const capturedUrlString = await req.text();
-  const url = new URL(capturedUrlString);
-  const response = getResponse(returnInstructions);
-  return { url, response };
-}
-
-/**
- * Returns a Response object based on the provided return instructions.
- * @param returnInstructions Instructions to return to the user, either as a string or a Response object.
- * @return A Response object with the provided instructions.
- */
-function getResponse(returnInstructions: string | Response): Response {
-  if (typeof returnInstructions === "string") {
-    return new Response(
-      returnInstructions,
-      {
-        headers: { "Content-Type": "text/html" },
-      },
+import { CaptureAuthUrlError } from "./errors.ts";
+export async function readBoundedBody(
+  request: Request,
+  maximum: number,
+): Promise<string> {
+  const length = request.headers.get("content-length");
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > maximum)) {
+    throw new CaptureAuthUrlError(
+      "BODY_TOO_LARGE",
+      "Request body exceeds the configured limit",
     );
   }
-  return returnInstructions;
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maximum) {
+        await reader.cancel();
+        throw new CaptureAuthUrlError(
+          "BODY_TOO_LARGE",
+          "Request body exceeds the configured limit",
+        );
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof CaptureAuthUrlError) throw error;
+    throw new CaptureAuthUrlError(
+      "INVALID_BODY",
+      "Could not read request body",
+      { cause: error },
+    );
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (error) {
+    throw new CaptureAuthUrlError("INVALID_BODY", "Request body is not UTF-8", {
+      cause: error,
+    });
+  }
 }

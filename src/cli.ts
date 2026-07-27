@@ -24,7 +24,7 @@ export async function main(args: string[]): Promise<number> {
   }
   const url = await captureAuthUrl(
     loginUrl,
-    port ? parseInt(port, 10) : undefined,
+    port ? { port: parseInt(port, 10) } : {},
   );
   console.log(`${url}`);
   return 0;

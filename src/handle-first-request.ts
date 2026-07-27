@@ -1,53 +1,47 @@
-/**
- * Handles the first request by returning an HTML page that
- * contains client-side JavaScript to capture the URL
- * and send it back to the server.
- * @param path The path to which the POST request should be sent.
- * @param htmlLang Language attribute for the HTML document.
- * @param htmlTitle Title of the HTML document.
- * @return {Response} A Response object containing the HTML page.
- */
-export function handleFirstRequest(
-  path: string,
-  htmlLang: string,
-  htmlTitle: string,
-): Response {
-  // Retain the legacy default page while serializing configured paths for JavaScript.
-  const fetchPath = path === "/capture-url"
-    ? "'/capture-url'"
-    : serializeForInlineScript(path);
-  return new Response(
-    `
-            <!DOCTYPE html>
-            <html lang="${htmlLang}">
-            <head>
-                <title>${htmlTitle}</title>
-                <script>
-                window.addEventListener('load', () => {
-                    const url = window.location.toString();
-                    fetch(${fetchPath}, { method: 'POST', body: url })
-                        .then(response => response.text())
-                        .then(instructions => {
-                        document.body.innerHTML = instructions;
-                        });
-                });
-                </script>
-            </head>
-            <body>
-                <h1>Waiting for authentication...</h1>
-            </body>
-            </html>`,
-    {
-      headers: { "Content-Type": "text/html" },
-    },
+function htmlEscape(value: string): string {
+  return value.replace(/[&<>"']/g, (character) =>
+    ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]!);
+}
+
+function scriptValue(value: string): string {
+  return JSON.stringify(value).replace(
+    /[<>&\u2028\u2029]/g,
+    (character) =>
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
   );
 }
 
-function serializeForInlineScript(value: string): string {
-  return JSON.stringify(value)
-    .replaceAll("<", "\\u003c")
-    .replaceAll(">", "\\u003e")
-    .replaceAll("&", "\\u0026")
-    .replaceAll("\u2028", "\\u2028")
-    .replaceAll("\u2029", "\\u2029");
+export function handleFirstRequest(
+  capturePath: string,
+  sessionId: string,
+  nonce: string,
+  htmlLang: string,
+  htmlTitle: string,
+): Response {
+  const html = `<!doctype html><html lang="${
+    htmlEscape(htmlLang)
+  }"><head><meta charset="utf-8"><title>${
+    htmlEscape(htmlTitle)
+  }</title></head><body><script nonce="${htmlEscape(nonce)}">
+fetch(${
+    scriptValue(capturePath)
+  }, {method:"POST", headers:{"Content-Type":"text/plain", "X-Capture-Auth-Session":${
+    scriptValue(sessionId)
+  }}, body:window.location.href}).then(async response => document.body.innerHTML = await response.text());
+</script></body></html>`;
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "Content-Security-Policy":
+        `default-src 'none'; script-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'`,
+    },
+  });
 }

@@ -1,6 +1,6 @@
 {
   "name": "@hugojosefson/capture-auth-url",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "exports": {
     ".": "./mod.ts",
     "./cli": "./src/cli.ts"

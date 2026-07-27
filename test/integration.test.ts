@@ -1,211 +1,271 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { getPort } from "@openjs/port-free";
-import { startServer } from "../src/start-server.ts";
-import { captureAuthUrl } from "../src/capture-auth-url.ts";
+import { captureAuthUrl, CaptureAuthUrlError } from "../mod.ts";
 
-function getRandomPort(): Promise<number> {
-  return getPort({ port: undefined, random: true });
+const port = () => getPort({ port: undefined, random: true });
+const sleep = (milliseconds: number) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function callback(origin: string, path = "/callback"): Promise<string> {
+  const response = await fetch(`${origin}${path}`);
+  const html = await response.text();
+  assertEquals(response.status, 200);
+  return html.match(/X-Capture-Auth-Session":("[^"]+")/)![1].slice(1, -1);
 }
 
-Deno.test("startServer integration", async () => {
-  const port = await getRandomPort();
-  const { server, urlPromise } = startServer(
-    port,
-    5000,
-    "Done",
-    "en",
-    "Test",
-  );
-
-  // Wait for server to be ready
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  try {
-    // Simulate browser initial request
-    const response1 = await fetch(`http://localhost:${port}`);
-    assertEquals(response1.status, 200);
-    assertEquals(response1.headers.get("Content-Type"), "text/html");
-    await response1.text(); // Consume the response body
-
-    // Simulate browser sending back URL with hash
-    const testUrl = `http://localhost:${port}/callback#token=abc123`;
-    const response2 = await fetch(`http://localhost:${port}/capture-url`, {
-      method: "POST",
-      body: testUrl,
-    });
-    assertEquals(response2.status, 200);
-    const text = await response2.text();
-    assertEquals(text, "Done");
-
-    const capturedUrl = await urlPromise;
-    assertEquals(capturedUrl.toString(), testUrl);
-  } finally {
-    await server.shutdown();
-  }
-});
-
-Deno.test("captureAuthUrl integration", async () => {
-  const port = await getRandomPort();
-  let openedUrl: string | undefined;
-
-  // Mock open function that simulates browser behavior
-  const mockOpen = async (url: string) => {
-    openedUrl = url;
-    await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for server
-    const response1 = await fetch(`http://localhost:${port}`);
-    await response1.text();
-
-    const response2 = await fetch(`http://localhost:${port}/capture-url`, {
-      method: "POST",
-      body: `http://localhost:${port}/callback#token=xyz789`,
-    });
-    await response2.text();
-  };
-
-  const loginUrl =
-    `https://auth.example.com/login?redirect_uri=http://localhost:${port}/callback`;
-  const url = await captureAuthUrl(
-    loginUrl,
-    port,
-    5000,
-    "Done",
-    "en",
-    "Test",
-    mockOpen,
-  );
-
-  assertEquals(openedUrl, loginUrl);
-  assertEquals(url.hash, "#token=xyz789");
-});
-
-Deno.test("startServer options bind hostname, restrict callback, and use custom paths", async () => {
-  const port = await getRandomPort();
-  const { server, urlPromise } = startServer({
-    port,
-    hostname: "127.0.0.1",
-    callbackPath: "/callback",
-    capturePath: "/capture",
-    cors: "https://login.example.com",
-    totalTimeoutMillis: 5000,
-    returnInstructions: "Done",
-    htmlLang: "en",
-    htmlTitle: "Test",
-  });
-  try {
-    const wrongCallback = await fetch(`http://127.0.0.1:${port}/other`);
-    assertEquals(wrongCallback.status, 404);
-
-    const callback = await fetch(`http://127.0.0.1:${port}/callback`);
-    assertEquals((await callback.text()).includes('fetch("/capture"'), true);
-
-    const preflight = await fetch(`http://127.0.0.1:${port}/capture`, {
-      method: "OPTIONS",
-    });
-    assertEquals(
-      preflight.headers.get("Access-Control-Allow-Origin"),
-      "https://login.example.com",
-    );
-
-    const captured = `http://127.0.0.1:${port}/callback#token=custom`;
-    const response = await fetch(`http://127.0.0.1:${port}/capture`, {
-      method: "POST",
-      body: captured,
-    });
-    assertEquals(
-      response.headers.get("Access-Control-Allow-Origin"),
-      "https://login.example.com",
-    );
-    assertEquals((await urlPromise).toString(), captured);
-  } finally {
-    await server.shutdown();
-  }
-});
-
-Deno.test("legacy defaults and disabled CORS headers", async () => {
-  const port = await getRandomPort();
-  const legacy = startServer(port, 5000, "Done", "en", "Test");
-  try {
-    const callback = await fetch(`http://localhost:${port}/any-callback`);
-    assertEquals(callback.status, 200);
-    assertEquals(
-      (await callback.text()).includes("fetch('/capture-url'"),
-      true,
-    );
-    const preflight = await fetch(`http://localhost:${port}/capture-url`, {
-      method: "OPTIONS",
-    });
-    assertEquals(preflight.headers.get("Access-Control-Allow-Origin"), "*");
-    const response = await fetch(`http://localhost:${port}/capture-url`, {
-      method: "POST",
-      body: `http://localhost:${port}/any-callback#legacy`,
-    });
-    assertEquals(response.headers.get("Access-Control-Allow-Origin"), null);
-    await legacy.urlPromise;
-  } finally {
-    await legacy.server.shutdown();
-  }
-
-  const disabledPort = await getRandomPort();
-  const disabled = startServer({
-    port: disabledPort,
-    cors: false,
-    totalTimeoutMillis: 5000,
-    returnInstructions: "Done",
-    htmlLang: "en",
-    htmlTitle: "Test",
-  });
-  try {
-    const preflight = await fetch(
-      `http://localhost:${disabledPort}/capture-url`,
-      {
-        method: "OPTIONS",
-      },
-    );
-    assertEquals(preflight.headers.get("Access-Control-Allow-Origin"), null);
-    const response = await fetch(
-      `http://localhost:${disabledPort}/capture-url`,
-      {
-        method: "POST",
-        body: `http://localhost:${disabledPort}/callback#disabled`,
-      },
-    );
-    assertEquals(response.headers.get("Access-Control-Allow-Origin"), null);
-    await disabled.urlPromise;
-  } finally {
-    await disabled.server.shutdown();
-  }
-});
-
-Deno.test("captureAuthUrl options object", async () => {
-  const port = await getRandomPort();
-  const loginUrl = "https://auth.example.com/login";
-  const url = await captureAuthUrl(loginUrl, {
-    port,
-    hostname: "127.0.0.1",
-    callbackPath: "/callback",
-    capturePath: "/capture",
-    totalTimeoutMillis: 5000,
+Deno.test("defaults bind localhost, require redirect_uri, and capture the exact callback URL", async () => {
+  const listenerPort = await port();
+  const origin = `http://localhost:${listenerPort}`;
+  const login = `https://auth.example/login?redirect_uri=${
+    encodeURIComponent(`${origin}/callback`)
+  }`;
+  const result = await captureAuthUrl(login, {
     open: async () => {
-      const callback = await fetch(`http://127.0.0.1:${port}/callback`);
-      await callback.text();
-      await fetch(`http://127.0.0.1:${port}/capture`, {
+      const session = await callback(origin);
+      const response = await fetch(`${origin}/capture-url`, {
         method: "POST",
-        body: `http://127.0.0.1:${port}/callback#options`,
+        headers: {
+          Origin: origin,
+          "Content-Type": "text/plain",
+          "X-Capture-Auth-Session": session,
+        },
+        body: `${origin}/callback#secret`,
+      });
+      assertEquals(response.status, 200);
+      assertEquals(response.headers.get("Access-Control-Allow-Origin"), null);
+    },
+  });
+  assertEquals(result.toString(), `${origin}/callback#secret`);
+});
+
+Deno.test("rejects redirect mismatch and non-loopback redirects before opening", async () => {
+  const listenerPort = await port();
+  const local = `https://auth.example/?redirect_uri=${
+    encodeURIComponent(`http://localhost:${listenerPort}/callback`)
+  }`;
+  await assertRejects(
+    () => captureAuthUrl(local, { hostname: "127.0.0.1" }),
+    CaptureAuthUrlError,
+    "match",
+  );
+  await assertRejects(
+    () => captureAuthUrl("https://auth.example/"),
+    CaptureAuthUrlError,
+    "redirect_uri",
+  );
+  await assertRejects(
+    () =>
+      captureAuthUrl(
+        `https://auth.example/?redirect_uri=${
+          encodeURIComponent("http://127.0.0.1:444/callback")
+        }`,
+      ),
+    CaptureAuthUrlError,
+  );
+});
+
+Deno.test("configured IPv4 loopback host captures an IPv4 redirect", async () => {
+  const listenerPort = await port();
+  const origin = `http://127.0.0.1:${listenerPort}`;
+  const login = `https://auth.example/?redirect_uri=${
+    encodeURIComponent(`${origin}/callback`)
+  }`;
+  const result = await captureAuthUrl(login, {
+    hostname: "127.0.0.1",
+    open: async () => {
+      const session = await callback(origin);
+      await fetch(`${origin}/capture-url`, {
+        method: "POST",
+        headers: {
+          Origin: origin,
+          "Content-Type": "text/plain",
+          "X-Capture-Auth-Session": session,
+        },
+        body: `${origin}/callback#ipv4`,
       });
     },
   });
-  assertEquals(url.hash, "#options");
+  assertEquals(result.hash, "#ipv4");
 });
 
-Deno.test("startServer rejects unsafe configured paths", () => {
-  assertThrows(() =>
-    startServer({
-      port: 1,
-      callbackPath: "/callback?query",
-      totalTimeoutMillis: 1,
-      returnInstructions: "Done",
-      htmlLang: "en",
-      htmlTitle: "Test",
-    })
+Deno.test("routes, origin, host, method, type, session, and captured target are restricted", async () => {
+  const listenerPort = await port();
+  const origin = `http://localhost:${listenerPort}`;
+  const login = `https://auth.example/?redirect_uri=${
+    encodeURIComponent(`${origin}/callback`)
+  }`;
+  let resolveOpen!: () => void;
+  const flow = captureAuthUrl(login, {
+    totalTimeoutMillis: 300,
+    open: () =>
+      new Promise<void>((resolve) => {
+        resolveOpen = resolve;
+      }),
+  });
+  await sleep(20);
+  assertEquals((await fetch(`${origin}/other`)).status, 404);
+  assertEquals(
+    (await fetch(`${origin}/callback`, { method: "POST" })).status,
+    405,
   );
+  const session = await callback(origin);
+  const headers = {
+    Origin: origin,
+    "Content-Type": "text/plain",
+    "X-Capture-Auth-Session": session,
+  };
+  assertEquals(
+    (await fetch(`${origin}/capture-url`, { method: "GET" })).status,
+    405,
+  );
+  assertEquals(
+    (await fetch(`${origin}/capture-url`, {
+      method: "POST",
+      headers: { ...headers, Origin: "https://evil.example" },
+      body: `${origin}/callback`,
+    })).status,
+    403,
+  );
+  assertEquals(
+    (await fetch(`${origin}/capture-url`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: `${origin}/callback`,
+    })).status,
+    415,
+  );
+  assertEquals(
+    (await fetch(`${origin}/capture-url`, {
+      method: "POST",
+      headers: { ...headers, "X-Capture-Auth-Session": "wrong" },
+      body: `${origin}/callback`,
+    })).status,
+    403,
+  );
+  assertEquals(
+    (await fetch(`${origin}/capture-url`, {
+      method: "POST",
+      headers,
+      body: `${origin}/other`,
+    })).status,
+    400,
+  );
+  resolveOpen();
+  await assertRejects(() => flow, CaptureAuthUrlError, "timed out");
+});
+
+Deno.test("explicit CORS accepts only its configured origin and large bodies do not settle", async () => {
+  const listenerPort = await port();
+  const origin = `http://localhost:${listenerPort}`;
+  const cors = "https://broker.example";
+  const login = `https://auth.example/?redirect_uri=${
+    encodeURIComponent(`${origin}/callback`)
+  }`;
+  const result = captureAuthUrl(login, {
+    cors,
+    maxRequestBodyBytes: 64,
+    open: async () => {
+      const session = await callback(origin);
+      const headers = {
+        Origin: cors,
+        "Content-Type": "text/plain",
+        "X-Capture-Auth-Session": session,
+      };
+      const preflight = await fetch(`${origin}/capture-url`, {
+        method: "OPTIONS",
+        headers: { Origin: cors },
+      });
+      assertEquals(preflight.headers.get("Access-Control-Allow-Origin"), cors);
+      const oversized = await fetch(`${origin}/capture-url`, {
+        method: "POST",
+        headers,
+        body: "x".repeat(100),
+      });
+      assertEquals(oversized.status, 413);
+      assertEquals(oversized.headers.get("Access-Control-Allow-Origin"), cors);
+      const response = await fetch(`${origin}/capture-url`, {
+        method: "POST",
+        headers,
+        body: `${origin}/callback`,
+      });
+      assertEquals(response.headers.get("Access-Control-Allow-Origin"), cors);
+      assertEquals(response.status, 200);
+    },
+  });
+  assertEquals((await result).pathname, "/callback");
+});
+
+Deno.test("timeout and browser opening failures reject with typed errors", async () => {
+  const listenerPort = await port();
+  const redirect = encodeURIComponent(
+    `http://localhost:${listenerPort}/callback`,
+  );
+  await assertRejects(
+    () =>
+      captureAuthUrl(`https://auth.example/?redirect_uri=${redirect}`, {
+        totalTimeoutMillis: 10,
+        open: () => new Promise<void>(() => undefined),
+      }),
+    CaptureAuthUrlError,
+    "timed out",
+  );
+  await assertRejects(() => fetch(`http://localhost:${listenerPort}`));
+  const failedOpenPort = await port();
+  const failedOpenRedirect = encodeURIComponent(
+    `http://localhost:${failedOpenPort}/callback`,
+  );
+  await assertRejects(
+    () =>
+      captureAuthUrl(
+        `https://auth.example/?redirect_uri=${failedOpenRedirect}`,
+        {
+          open: () => Promise.reject(new Error("no browser")),
+        },
+      ),
+    CaptureAuthUrlError,
+    "open",
+  );
+  await assertRejects(() => fetch(`http://localhost:${failedOpenPort}`));
+});
+
+Deno.test("timeout aborts a stalled request body", async () => {
+  const listenerPort = await port();
+  const origin = `http://localhost:${listenerPort}`;
+  const redirect = encodeURIComponent(`${origin}/callback`);
+  const clientController = new AbortController();
+  let request: Promise<Response> | undefined;
+  try {
+    const flow = captureAuthUrl(
+      `https://auth.example/?redirect_uri=${redirect}`,
+      {
+        totalTimeoutMillis: 100,
+        open: async () => {
+          const session = await callback(origin);
+          const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(`${origin}/callback#partial`),
+              );
+            },
+          });
+          request = fetch(`${origin}/capture-url`, {
+            method: "POST",
+            headers: {
+              Origin: origin,
+              "Content-Type": "text/plain",
+              "X-Capture-Auth-Session": session,
+            },
+            body,
+            signal: clientController.signal,
+          });
+          await sleep(20);
+        },
+      },
+    );
+    await assertRejects(() => flow, CaptureAuthUrlError, "timed out");
+    await assertRejects(() => fetch(origin));
+  } finally {
+    clientController.abort();
+    await request?.catch(() => undefined);
+  }
 });

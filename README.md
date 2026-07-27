@@ -24,37 +24,46 @@ Use an options object to configure the listener:
 
 ```typescript
 const url = await captureAuthUrl(loginUrl, {
-  hostname: "127.0.0.1",
-  callbackPath: "/callback",
-  capturePath: "/capture-url",
-  cors: "https://login.example.com",
+  hostname: "localhost",
+  maxRequestBodyBytes: 16 * 1024,
+  totalTimeoutMillis: 60_000,
 });
 ```
 
-| Option               | Description                                                                                                                                     |
-| :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `port`               | Listener port. Defaults to the port in `redirect_uri`.                                                                                          |
-| `hostname`           | Listener hostname. Omitted uses Deno's all-interface bind.                                                                                      |
-| `callbackPath`       | Exact callback GET pathname. Omitted accepts GET requests on any pathname.                                                                      |
-| `capturePath`        | Browser POST pathname. Defaults to `/capture-url`.                                                                                              |
-| `cors`               | `false` disables CORS headers; a string sets that exact allowed origin. Omitted preserves legacy wildcard headers for `OPTIONS` responses only. |
-| `totalTimeoutMillis` | Authentication timeout. Defaults to 10 minutes.                                                                                                 |
-| `returnInstructions` | String or `Response` displayed after capture.                                                                                                   |
-| `htmlLang`           | Callback page language. Defaults to `en`.                                                                                                       |
-| `htmlTitle`          | Callback page title. Defaults to `Authentication`.                                                                                              |
-| `open`               | Function that opens the login URL.                                                                                                              |
+| Option                                        | Description                                                                                       |
+| :-------------------------------------------- | :------------------------------------------------------------------------------------------------ |
+| `hostname`, `port`, `callbackPath`            | Must exactly match `redirect_uri`; defaults come from it except hostname defaults to `localhost`. |
+| `capturePath`                                 | Exact local POST pathname; defaults to `/capture-url`.                                            |
+| `cors`                                        | Disabled by default. A string intentionally permits that POST Origin.                             |
+| `maxRequestBodyBytes`                         | Bounded submitted URL size; defaults to 16 KiB.                                                   |
+| `totalTimeoutMillis`                          | Flow timeout; defaults to 10 minutes.                                                             |
+| `returnInstructions`, `htmlLang`, `htmlTitle` | Callback-page display settings.                                                                   |
+| `open`, `randomBytes`, `createServer`         | Browser, entropy, and server dependency injection.                                                |
 
-The positional signature remains supported. Omitted options intentionally retain
-the prior defaults, including Deno's all-interface bind and legacy CORS
-behavior.
+`captureAuthUrl(loginUrl, options?)` is the only API signature. It requires an
+HTTP loopback `redirect_uri` (`localhost`, `127.0.0.0/8`, or `::1`). The port
+defaults to HTTP port 80 when omitted. The listener binds only the configured
+hostname and validates the configured host, port, and callback path before
+opening the browser.
 
-For a loopback-only listener with a fixed callback and no CORS headers:
+The callback page sends the full URL using a random one-time header value. The
+listener accepts only its exact callback and capture paths, validates request
+Host, Origin, method, content type, and submitted URL target, and uses bounded
+bodies. It does not log callback data. The returned URL and CLI stdout retain
+the captured URL because that is this module's purpose.
+
+### Migrating from 0.2
+
+Replace positional arguments with the options object. `redirect_uri` is now
+required, wildcard CORS is gone, and callback paths no longer accept every GET.
+For a `127.0.0.1` or `::1` redirect, set the matching `hostname`; the default
+`localhost` intentionally does not match a numeric redirect host.
 
 ```typescript
-const url = await captureAuthUrl(loginUrl, {
+const ipv4LoginUrl =
+  "https://example.com/login?redirect_uri=http://127.0.0.1:1234/callback";
+const url = await captureAuthUrl(ipv4LoginUrl, {
   hostname: "127.0.0.1",
-  callbackPath: "/callback",
-  cors: false,
 });
 ```
 
